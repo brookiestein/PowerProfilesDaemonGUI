@@ -10,7 +10,7 @@
 
 class MainWindow : public Gtk::Window
 {
-	 void on_profile_changed();
+	 void on_profile_changed(const Gtk::CheckButton &sender);
 	 void on_quit();
 
 public:
@@ -32,6 +32,11 @@ private:
 	 Gtk::Separator m_separator;
 	 Gtk::Box m_buttons_hbox;
 	 Gtk::Button m_quit_button;
+
+	 // When the program starts, we set the currently active power profile
+	 // in its corresponding check button. This flag tells on_profile_changed()
+	 // not to reapply the same profile.
+	 bool m_starting;
 };
 
 #endif // MAIN_WINDOW_HPP
