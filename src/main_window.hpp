@@ -24,6 +24,7 @@ public:
 private:
 	 void activate_current_profile_on_radio_button();
 	 void show_alert(ALERT_TYPE type, const std::string &message);
+	 void on_success(const std::string &message);
 	 void on_error(const std::string &message);
 
 	 std::unique_ptr<DBusManager> m_dbus_manager;

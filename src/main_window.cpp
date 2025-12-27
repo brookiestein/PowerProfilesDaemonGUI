@@ -1,8 +1,11 @@
 #include "main_window.hpp"
+#include "config.hpp"
 
 #include <cassert>
 #include <format>
+#include <gdkmm/display.h>
 #include <gtkmm/alertdialog.h>
+#include <gtkmm/icontheme.h>
 #include <pangomm/attrlist.h>
 #include <print>
 
@@ -96,7 +99,13 @@ MainWindow::MainWindow()
 	 m_master_vbox.set_valign(Gtk::Align::CENTER);
 
 	 set_child(m_master_vbox);
-	 set_title("Power Profiles Daemon GUI");
+	 set_title(PRETTY_NAME);
+
+	 Glib::RefPtr<Gdk::Display> display = get_display();
+	 Glib::RefPtr<Gtk::IconTheme> icon_theme = Gtk::IconTheme::get_for_display(display);
+
+	 icon_theme->add_resource_path("com/github/brookiestein/powerprofilesdaemongui/icons");
+	 set_icon_name("icon");
 }
 
 void MainWindow::activate_current_profile_on_radio_button()
@@ -124,6 +133,11 @@ void MainWindow::show_alert(MainWindow::ALERT_TYPE type, const std::string &mess
 {
 	 Glib::RefPtr<Gtk::AlertDialog> alert_dialog = Gtk::AlertDialog::create(message);
 	 alert_dialog->show(*this);
+}
+
+void MainWindow::on_success(const std::string &message)
+{
+	 show_alert(ALERT_TYPE::INFO, message);
 }
 
 void MainWindow::on_error(const std::string &message)

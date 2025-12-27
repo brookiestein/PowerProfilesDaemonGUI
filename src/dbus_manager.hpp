@@ -1,9 +1,9 @@
 #ifndef DBUS_MANAGER_HPP
 #define DBUS_MANAGER_HPP
 
+#include <giomm/dbusconnection.h>
 #include <string>
 #include <sigc++/sigc++.h>
-#include <dbus/dbus.h>
 
 class DBusManager
 {
@@ -18,12 +18,12 @@ private:
 	 POWER_PROFILE string_to_power_profile(const std::string &profile);
 
 	 sigc::signal<void(const std::string &)> m_error_signal;
-	 const char *DEST;
-	 const char *PATH;
-	 const char *IFACE; // DBus interface
-	 const char *TARGET_IFACE; // PowerProfilesDaemon interface.
-	 const char *PROPERTY;
-	 DBusConnection *m_dbus_connection;
+	 Glib::RefPtr<Gio::DBus::Connection> m_dbus_connection;
+	 const Glib::ustring DEST;
+	 const Glib::ustring PATH;
+	 const Glib::ustring IFACE; // DBus interface
+	 const Glib::ustring TARGET_IFACE; // PowerProfilesDaemon interface.
+	 const Glib::ustring PROPERTY;
 };
 
 #endif // DBUS_MANAGER_HPP

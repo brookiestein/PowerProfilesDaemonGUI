@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gresources>
+  <gresource prefix="/com/github/brookiestein/powerprofilesdaemongui">
+	<file alias="icons/hicolor/48x48/apps/icon.png">assets/icons/hicolor/48x48/powerprofilesdaemonguiicon.png</file>
+	<file alias="icons/hicolor/128x128/apps/icon.png">assets/icons/hicolor/128x128/powerprofilesdaemonguiicon.png</file>
+  </gresource>
+</gresources>

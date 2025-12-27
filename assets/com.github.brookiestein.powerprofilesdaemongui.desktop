@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=PowerProfilesDaemonGUI
+Exec=/usr/local/bin/powerprofilesgui
+Type=Application
+Comment=A basic GUI for the power-profiles-daemon utility.
+StartupWMClass=com.github.brookiestein.powerprofilesdaemongui
+Icon=/usr/local/share/icons/hicolor/128x128/icon.png
+Categories=System;
+Terminal=false
+StartupNotify=true

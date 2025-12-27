@@ -4,8 +4,11 @@
 #include <cctype>
 #include <cassert>
 #include <format>
+#include <giomm/dbusmessage.h>
+#include <giomm/error.h>
 #include <print>
 #include <string>
+#include <tuple>
 
 DBusManager::DBusManager(sigc::slot<void (const std::string &)> on_error)
 	 : DEST("org.freedesktop.UPower.PowerProfiles")
@@ -16,89 +19,34 @@ DBusManager::DBusManager(sigc::slot<void (const std::string &)> on_error)
 {
 	 m_error_signal.connect(on_error);
 
-	 DBusError error;
-	 dbus_error_init(&error);
-
-	 m_dbus_connection = dbus_bus_get(DBUS_BUS_SYSTEM, &error);
+	 m_dbus_connection = Gio::DBus::Connection::get_sync(Gio::DBus::BusType::SYSTEM, nullptr);
 
 	 if (!m_dbus_connection) {
-		  std::string message = std::format("Could not get system bus.\nError message: {}", error.message);
-		  dbus_error_free(&error);
-		  throw std::runtime_error(message);
+		  throw std::runtime_error("Could not get system bus.");
 	 }
-
-	 dbus_error_free(&error);
 }
 
 DBusManager::POWER_PROFILE DBusManager::fetch_current_power_profile()
 {
-	 const char *method = "Get";
-	 DBusMessage *message = dbus_message_new_method_call(DEST,
-														 PATH,
-														 IFACE,
-														 method);
-
-	 if (!message) {
-		  m_error_signal.emit("System ran out of memory when allocating the DBus message.");
-		  return POWER_PROFILE::INVALID;
-	 }
-
-	 assert(
-		  dbus_message_append_args(message, DBUS_TYPE_STRING, &TARGET_IFACE, DBUS_TYPE_STRING, &PROPERTY, DBUS_TYPE_INVALID) &&
-		  "Failed to append arguments."
+	 auto arguments = Glib::Variant<std::tuple<Glib::ustring, Glib::ustring>>::create(
+		  std::make_tuple(TARGET_IFACE, PROPERTY)
 	 );
 
-	 DBusError error;
-	 dbus_error_init(&error);
+	 Glib::VariantContainerBase reply = m_dbus_connection->call_sync(PATH,
+																	 IFACE,
+																	 Glib::ustring("Get"),
+																	 arguments,
+																	 nullptr,
+																	 DEST,
+																	 -1,
+																	 Gio::DBus::CallFlags::NONE,
+																	 Glib::VariantType("(v)"));
 
-	 DBusMessage *reply = dbus_connection_send_with_reply_and_block(
-		  m_dbus_connection,
-		  message,
-		  DBUS_TIMEOUT_USE_DEFAULT,
-		  &error
-	 );
+	 Glib::Variant<std::tuple<Glib::ustring>> rply;
+	 reply.get_child(rply);
 
-	 if (!reply) {
-		  m_error_signal.emit(
-			   std::format("Failed to fetch current profile.\nError message: {}", error.message)
-		  );
-
-		  dbus_error_free(&error);
-		  return POWER_PROFILE::INVALID;
-	 }
-
-	 dbus_error_free(&error);
-
-	 DBusMessageIter args;
-	 if (!dbus_message_iter_init(reply, &args)) {
-		  dbus_message_unref(reply);
-		  m_error_signal.emit("Got no response from Power Profiles Daemon.");
-		  return POWER_PROFILE::INVALID;
-	 }
-
-	 if (dbus_message_iter_get_arg_type(&args) != DBUS_TYPE_VARIANT) {
-		  dbus_message_unref(reply);
-		  m_error_signal.emit("Got ill-formed response.");
-		  return POWER_PROFILE::INVALID;
-	 }
-
-	 DBusMessageIter current_arg;
-	 dbus_message_iter_recurse(&args, &current_arg);
-
-	 if (dbus_message_iter_get_arg_type(&current_arg) != DBUS_TYPE_STRING) {
-		  dbus_message_unref(reply);
-		  m_error_signal.emit("Didn't found current profile in response.");
-		  return POWER_PROFILE::INVALID;
-	 }
-
-	 char *str;
-	 dbus_message_iter_get_basic(&current_arg, &str);
-
-	 std::string current_profile(str);
-
-	 dbus_message_unref(reply);
-
-	 return string_to_power_profile(current_profile);
+	 std::string active_profile(std::get<0>(rply.get()));
+	 return string_to_power_profile(active_profile);
 }
 
 DBusManager::POWER_PROFILE DBusManager::string_to_power_profile(const std::string &profile)
@@ -106,8 +54,6 @@ DBusManager::POWER_PROFILE DBusManager::string_to_power_profile(const std::strin
 	 auto ichar_equals = [] (char a, char b) -> bool {
 		  return std::tolower(static_cast<unsigned char>(a)) == std::tolower(static_cast<unsigned char>(b));
 	 };
-
-	 std::string prof = power_profile_to_string(POWER_PROFILE::POWER_SAVER);
 
 	 if (std::equal(profile.begin(), profile.end(),
 					power_profile_to_string(POWER_PROFILE::POWER_SAVER).begin(),
@@ -142,19 +88,11 @@ std::string DBusManager::power_profile_to_string(POWER_PROFILE profile)
 bool DBusManager::set_profile(POWER_PROFILE profile)
 {
 	 if (profile == POWER_PROFILE::INVALID) {
-		  m_error_signal.emit("Cannot set invalid power profile.");
+		  m_error_signal.emit("Cannot set invalid an power profile.");
 		  return false;
 	 }
 
-	 const char *method = "Set";
-	 DBusMessage *message = dbus_message_new_method_call(DEST, PATH, IFACE, method);
-
-	 if (!message) {
-		  m_error_signal.emit("System ran out of memory while allocating the DBus message to be sent.");
-		  return false;
-	 }
-
-	 const char *new_profile = nullptr;
+	 Glib::ustring new_profile;
 
 	 switch (profile)
 	 {
@@ -171,40 +109,21 @@ bool DBusManager::set_profile(POWER_PROFILE profile)
 		  break;
 	 }
 
-	 assert(new_profile);
+	 assert(!new_profile.empty());
 
-	 DBusMessageIter args;
-	 dbus_message_iter_init_append(message, &args);
-
-	 assert(dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING, &TARGET_IFACE));
-	 assert(dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING, &PROPERTY));
-
-	 DBusMessageIter value;
-	 const char *signature = "s";
-
-	 assert(dbus_message_iter_open_container(&args, DBUS_TYPE_VARIANT, signature, &value));
-	 assert(dbus_message_iter_append_basic(&value, DBUS_TYPE_STRING, &new_profile));
-	 assert(dbus_message_iter_close_container(&args, &value));
-
-	 DBusError error;
-	 dbus_error_init(&error);
-
-	 DBusMessage *reply = dbus_connection_send_with_reply_and_block(
-		  m_dbus_connection,
-		  message,
-		  DBUS_TIMEOUT_USE_DEFAULT,
-		  &error
+	 auto arguments = Glib::Variant<std::tuple<Glib::ustring, Glib::ustring, Glib::Variant<Glib::ustring>>>::create(
+		  std::make_tuple(TARGET_IFACE, PROPERTY, Glib::Variant<Glib::ustring>::create(new_profile))
 	 );
 
-	 if (!reply) {
-		  m_error_signal.emit(
-			   std::format("Failed to set current profile.\nError message: {}", error.message)
-		  );
+	 // The set method returns nothing.
+	 (void) m_dbus_connection->call_sync(PATH,
+										 IFACE,
+										 Glib::ustring("Set"),
+										 arguments,
+										 nullptr,
+										 DEST,
+										 -1,
+										 Gio::DBus::CallFlags::NONE);
 
-		  dbus_error_free(&error);
-		  return false;
-	 }
-
-	 dbus_error_free(&error);
 	 return true;
 }
