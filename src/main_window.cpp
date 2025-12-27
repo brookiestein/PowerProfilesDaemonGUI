@@ -4,8 +4,9 @@
 #include <cassert>
 #include <format>
 #include <gdkmm/display.h>
-#include <gtkmm/alertdialog.h>
 #include <gtkmm/icontheme.h>
+#include <giomm/notification.h>
+#include <gtkmm/application.h>
 #include <pangomm/attrlist.h>
 #include <print>
 
@@ -21,8 +22,12 @@ MainWindow::MainWindow()
 	 , m_check_buttons_vbox(Gtk::Orientation::VERTICAL, 0)
 	 , m_buttons_hbox(Gtk::Orientation::HORIZONTAL, 0)
 	 , m_quit_button("Quit")
-	 , m_dbus_manager(std::make_unique<DBusManager>(sigc::mem_fun(*this, &MainWindow::on_error)))
 {
+	 m_dbus_manager = std::make_unique<DBusManager>(
+		  sigc::mem_fun(*this, &MainWindow::on_success),
+		  sigc::mem_fun(*this, &MainWindow::on_error)
+	 );
+
 	 m_current_profile = m_dbus_manager->fetch_current_power_profile();
 	 activate_current_profile_on_radio_button();
 
@@ -131,8 +136,26 @@ void MainWindow::activate_current_profile_on_radio_button()
 
 void MainWindow::show_alert(MainWindow::ALERT_TYPE type, const std::string &message)
 {
-	 Glib::RefPtr<Gtk::AlertDialog> alert_dialog = Gtk::AlertDialog::create(message);
-	 alert_dialog->show(*this);
+	 Glib::RefPtr<Gio::Notification> notification = Gio::Notification::create(PRETTY_NAME);
+
+	 Gio::Notification::Priority priority;
+
+	 switch (type)
+	 {
+	 case ALERT_TYPE::INFO:
+		  priority = Gio::Notification::Priority::NORMAL;
+		  break;
+	 case ALERT_TYPE::WARNING:
+		  priority = Gio::Notification::Priority::HIGH;
+		  break;
+	 case ALERT_TYPE::ERROR:
+		  priority = Gio::Notification::Priority::URGENT;
+		  break;
+	 }
+
+	 notification->set_priority(priority);
+	 notification->set_body(message);
+	 get_application()->send_notification(APP_ID, notification);
 }
 
 void MainWindow::on_success(const std::string &message)

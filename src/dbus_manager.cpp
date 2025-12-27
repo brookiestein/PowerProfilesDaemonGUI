@@ -10,13 +10,15 @@
 #include <string>
 #include <tuple>
 
-DBusManager::DBusManager(sigc::slot<void (const std::string &)> on_error)
+DBusManager::DBusManager(sigc::slot<void (const std::string &)> on_success,
+						 sigc::slot<void (const std::string &)> on_error)
 	 : DEST("org.freedesktop.UPower.PowerProfiles")
 	 , PATH("/org/freedesktop/UPower/PowerProfiles")
 	 , IFACE("org.freedesktop.DBus.Properties")
 	 , TARGET_IFACE("org.freedesktop.UPower.PowerProfiles")
 	 , PROPERTY("ActiveProfile")
 {
+	 m_success_signal.connect(on_success);
 	 m_error_signal.connect(on_error);
 
 	 m_dbus_connection = Gio::DBus::Connection::get_sync(Gio::DBus::BusType::SYSTEM, nullptr);
@@ -124,6 +126,10 @@ bool DBusManager::set_profile(POWER_PROFILE profile)
 										 DEST,
 										 -1,
 										 Gio::DBus::CallFlags::NONE);
+
+	 m_success_signal.emit(
+		  std::format("Asked power-profiles-daemon to change active profile to: {}", std::string(new_profile))
+	 );
 
 	 return true;
 }

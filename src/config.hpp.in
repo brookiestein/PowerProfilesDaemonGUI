@@ -2,3 +2,4 @@
 #define PRETTY_NAME "${PRETTY_NAME}"
 #define PROJECT_VERSION "${PROJECT_VERSION}"
 #define PROJECT_DESCRIPTION "${PROJECT_DESCRIPTION}"
+#define APP_ID "com.github.brookiestein.powerprofilesdaemongui"

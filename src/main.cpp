@@ -26,7 +26,6 @@ int main(int argc, char *argv[])
 		  }
 	 }
 
-	 Glib::ustring appid("com.github.brookiestein.powerprofilesdaemongui");
-	 auto app = Gtk::Application::create(appid);
+	 auto app = Gtk::Application::create(APP_ID);
 	 return app->make_window_and_run<MainWindow>(argc, argv);
 }
