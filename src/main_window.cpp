@@ -23,10 +23,16 @@ MainWindow::MainWindow()
 	 , m_buttons_hbox(Gtk::Orientation::HORIZONTAL, 0)
 	 , m_quit_button("Quit")
 {
-	 m_dbus_manager = std::make_unique<DBusManager>(
-		  sigc::mem_fun(*this, &MainWindow::on_success),
-		  sigc::mem_fun(*this, &MainWindow::on_error)
-	 );
+	 // Constructor can throw an exception if system bus can't be obtained.
+	 m_dbus_manager = std::make_unique<DBusManager>();
+
+	 m_dbus_manager
+		  ->signal_success()
+		  .connect(sigc::mem_fun(*this, &MainWindow::on_success));
+
+	 m_dbus_manager
+		  ->signal_error()
+		  .connect(sigc::mem_fun(*this, &MainWindow::on_error));
 
 	 m_current_profile = m_dbus_manager->fetch_current_power_profile();
 	 activate_current_profile_on_radio_button();

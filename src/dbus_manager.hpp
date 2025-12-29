@@ -8,7 +8,9 @@
 class DBusManager
 {
 public:
-	 DBusManager(sigc::slot<void (const std::string &)> on_success, sigc::slot<void (const std::string &)> on_error);
+	 DBusManager();
+	 sigc::signal<void(const std::string &)> &signal_success();
+	 sigc::signal<void(const std::string &)> &signal_error();
 	 enum class POWER_PROFILE { INVALID = -1, POWER_SAVER = 0, BALANCED, PERFORMANCE };
 	 POWER_PROFILE fetch_current_power_profile();
 	 std::string power_profile_to_string(POWER_PROFILE profile);
@@ -17,11 +19,11 @@ public:
 private:
 	 POWER_PROFILE string_to_power_profile(const std::string &profile);
 
-	 sigc::signal<void(const std::string &)> m_error_signal;
-	 sigc::signal<void(const std::string &)> m_success_signal;
+	 sigc::signal<void(const std::string &)> m_signal_success;
+	 sigc::signal<void(const std::string &)> m_signal_error;
 	 Glib::RefPtr<Gio::DBus::Connection> m_dbus_connection;
 	 const Glib::ustring DEST;
-	 const Glib::ustring PATH;
+	 const Glib::ustring POWER_PROFILES_PATH;
 	 const Glib::ustring IFACE; // DBus interface
 	 const Glib::ustring TARGET_IFACE; // PowerProfilesDaemon interface.
 	 const Glib::ustring PROPERTY;

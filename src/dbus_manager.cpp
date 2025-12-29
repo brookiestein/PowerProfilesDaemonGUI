@@ -6,26 +6,32 @@
 #include <format>
 #include <giomm/dbusmessage.h>
 #include <giomm/error.h>
+#include <giomm/init.h>
 #include <print>
 #include <string>
 #include <tuple>
 
-DBusManager::DBusManager(sigc::slot<void (const std::string &)> on_success,
-						 sigc::slot<void (const std::string &)> on_error)
+DBusManager::DBusManager()
 	 : DEST("org.freedesktop.UPower.PowerProfiles")
-	 , PATH("/org/freedesktop/UPower/PowerProfiles")
+	 , POWER_PROFILES_PATH("/org/freedesktop/UPower/PowerProfiles")
 	 , IFACE("org.freedesktop.DBus.Properties")
 	 , TARGET_IFACE("org.freedesktop.UPower.PowerProfiles")
 	 , PROPERTY("ActiveProfile")
 {
-	 m_success_signal.connect(on_success);
-	 m_error_signal.connect(on_error);
-
 	 m_dbus_connection = Gio::DBus::Connection::get_sync(Gio::DBus::BusType::SYSTEM, nullptr);
 
-	 if (!m_dbus_connection) {
+	 if (!m_dbus_connection)
 		  throw std::runtime_error("Could not get system bus.");
-	 }
+}
+
+sigc::signal<void(const std::string &)> &DBusManager::signal_success()
+{
+	 return m_signal_success;
+}
+
+sigc::signal<void(const std::string &)> &DBusManager::signal_error()
+{
+	 return m_signal_error;
 }
 
 DBusManager::POWER_PROFILE DBusManager::fetch_current_power_profile()
@@ -34,7 +40,7 @@ DBusManager::POWER_PROFILE DBusManager::fetch_current_power_profile()
 		  std::make_tuple(TARGET_IFACE, PROPERTY)
 	 );
 
-	 Glib::VariantContainerBase reply = m_dbus_connection->call_sync(PATH,
+	 Glib::VariantContainerBase reply = m_dbus_connection->call_sync(POWER_PROFILES_PATH,
 																	 IFACE,
 																	 Glib::ustring("Get"),
 																	 arguments,
@@ -90,7 +96,7 @@ std::string DBusManager::power_profile_to_string(POWER_PROFILE profile)
 bool DBusManager::set_profile(POWER_PROFILE profile)
 {
 	 if (profile == POWER_PROFILE::INVALID) {
-		  m_error_signal.emit("Cannot set invalid an power profile.");
+		  m_signal_error.emit("Cannot set invalid an power profile.");
 		  return false;
 	 }
 
@@ -118,7 +124,7 @@ bool DBusManager::set_profile(POWER_PROFILE profile)
 	 );
 
 	 // The set method returns nothing.
-	 (void) m_dbus_connection->call_sync(PATH,
+	 (void) m_dbus_connection->call_sync(POWER_PROFILES_PATH,
 										 IFACE,
 										 Glib::ustring("Set"),
 										 arguments,
@@ -127,8 +133,9 @@ bool DBusManager::set_profile(POWER_PROFILE profile)
 										 -1,
 										 Gio::DBus::CallFlags::NONE);
 
-	 m_success_signal.emit(
-		  std::format("Asked power-profiles-daemon to change active profile to: {}", std::string(new_profile))
+	 m_signal_success.emit(
+		  std::format("Asked power-profiles-daemon to change active profile to: {}",
+					  std::string(new_profile))
 	 );
 
 	 return true;
