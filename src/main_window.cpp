@@ -10,8 +10,9 @@
 #include <pangomm/attrlist.h>
 #include <print>
 
-MainWindow::MainWindow()
-	 : m_title_label("Please choose a profile")
+MainWindow::MainWindow(Glib::RefPtr<Gtk::Application> app)
+	 : m_app(app)
+	 , m_title_label("Please choose a profile")
 	 , m_explanation_label("Profile will automatically be applied upon selection.")
 	 , m_power_saver("Power Saver")
 	 , m_balanced("Balanced")
@@ -34,8 +35,14 @@ MainWindow::MainWindow()
 		  ->signal_error()
 		  .connect(sigc::mem_fun(*this, &MainWindow::on_error));
 
-	 m_current_profile = m_dbus_manager->fetch_current_power_profile();
-	 activate_current_profile_on_radio_button();
+	 m_active_profile = m_dbus_manager->fetch_active_power_profile();
+	 if (m_active_profile == DBusManager::POWER_PROFILE::INVALID) {
+		  m_power_saver.set_sensitive(false);
+		  m_balanced.set_sensitive(false);
+		  m_performance.set_sensitive(false);
+	 } else {
+		  activate_current_profile_on_radio_button();
+	 }
 
 	 m_balanced.set_group(m_power_saver);
 	 m_performance.set_group(m_power_saver);
@@ -98,6 +105,7 @@ MainWindow::MainWindow()
 	 m_quit_button.set_hexpand(true);
 	 m_quit_button.set_halign(Gtk::Align::END);
 	 m_quit_button.set_margin(10);
+	 m_quit_button.set_tooltip_text("Immediately closes the application.");
 	 m_quit_button
 		  .signal_clicked()
 		  .connect(sigc::mem_fun(*this, &MainWindow::on_quit));
@@ -121,7 +129,7 @@ MainWindow::MainWindow()
 
 void MainWindow::activate_current_profile_on_radio_button()
 {
-	 switch (m_current_profile)
+	 switch (m_active_profile)
 	 {
 	 case DBusManager::POWER_PROFILE::INVALID:
 		  break;
@@ -142,6 +150,17 @@ void MainWindow::activate_current_profile_on_radio_button()
 
 void MainWindow::show_alert(MainWindow::ALERT_TYPE type, const std::string &message)
 {
+	 // Fallback to the get_application() method in case main() didn't send the app pointer.
+	 // I guess we'll get a segfault here if MainWindow isn't fully created at the time this
+	 // method gets called which just happens if DBusManager::fetch_active_power_profile()
+	 // fails to fetch the profile because power-profiles-daemon isn't running in the
+	 // user's machine, for example.
+	 //
+	 // The condition should never be true, though, because I made sure main() sends the ptr.
+	 // Take that into account if trying to modify main()'s behavior, though.
+	 if (!m_app)
+		  m_app = get_application();
+
 	 Glib::RefPtr<Gio::Notification> notification = Gio::Notification::create(PRETTY_NAME);
 
 	 Gio::Notification::Priority priority;
@@ -161,7 +180,7 @@ void MainWindow::show_alert(MainWindow::ALERT_TYPE type, const std::string &mess
 
 	 notification->set_priority(priority);
 	 notification->set_body(message);
-	 get_application()->send_notification(APP_ID, notification);
+	 m_app->send_notification(APP_ID, notification);
 }
 
 void MainWindow::on_success(const std::string &message)

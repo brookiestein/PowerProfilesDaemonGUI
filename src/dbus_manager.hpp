@@ -12,7 +12,7 @@ public:
 	 sigc::signal<void(const std::string &)> &signal_success();
 	 sigc::signal<void(const std::string &)> &signal_error();
 	 enum class POWER_PROFILE { INVALID = -1, POWER_SAVER = 0, BALANCED, PERFORMANCE };
-	 POWER_PROFILE fetch_current_power_profile();
+	 POWER_PROFILE fetch_active_power_profile();
 	 std::string power_profile_to_string(POWER_PROFILE profile);
 	 bool set_profile(POWER_PROFILE profile);
 

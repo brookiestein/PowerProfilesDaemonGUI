@@ -34,27 +34,35 @@ sigc::signal<void(const std::string &)> &DBusManager::signal_error()
 	 return m_signal_error;
 }
 
-DBusManager::POWER_PROFILE DBusManager::fetch_current_power_profile()
+DBusManager::POWER_PROFILE DBusManager::fetch_active_power_profile()
 {
 	 auto arguments = Glib::Variant<std::tuple<Glib::ustring, Glib::ustring>>::create(
 		  std::make_tuple(TARGET_IFACE, PROPERTY)
 	 );
 
-	 Glib::VariantContainerBase reply = m_dbus_connection->call_sync(POWER_PROFILES_PATH,
-																	 IFACE,
-																	 Glib::ustring("Get"),
-																	 arguments,
-																	 nullptr,
-																	 DEST,
-																	 -1,
-																	 Gio::DBus::CallFlags::NONE,
-																	 Glib::VariantType("(v)"));
+	 try {
+		  Glib::VariantContainerBase reply = m_dbus_connection->call_sync(POWER_PROFILES_PATH,
+																		  IFACE,
+																		  Glib::ustring("Get"),
+																		  arguments,
+																		  nullptr,
+																		  DEST,
+																		  -1,
+																		  Gio::DBus::CallFlags::NONE,
+																		  Glib::VariantType("(v)"));
 
-	 Glib::Variant<std::tuple<Glib::ustring>> rply;
-	 reply.get_child(rply);
+		  Glib::Variant<std::tuple<Glib::ustring>> rply;
+		  reply.get_child(rply);
 
-	 std::string active_profile(std::get<0>(rply.get()));
-	 return string_to_power_profile(active_profile);
+		  std::string active_profile(std::get<0>(rply.get()));
+		  return string_to_power_profile(active_profile);
+	 } catch (Glib::Error error) {
+		  std::println(stderr, "{}:{}: {}", __func__, __LINE__, error.what());
+	 }
+
+	 m_signal_error.emit("Failed to fetch active profile. Is power-profiles-daemon running?");
+
+	 return POWER_PROFILE::INVALID;
 }
 
 DBusManager::POWER_PROFILE DBusManager::string_to_power_profile(const std::string &profile)

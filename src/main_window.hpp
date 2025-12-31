@@ -1,6 +1,7 @@
 #ifndef MAIN_WINDOW_HPP
 #define MAIN_WINDOW_HPP
 
+#include <gtkmm/application.h>
 #include <gtkmm/box.h>
 #include <gtkmm/button.h>
 #include <gtkmm/checkbutton.h>
@@ -18,7 +19,7 @@ class MainWindow : public Gtk::Window
 	 void on_quit();
 
 public:
-	 MainWindow();
+	 MainWindow(Glib::RefPtr<Gtk::Application> app = nullptr);
 	 enum class ALERT_TYPE { INFO = 0, WARNING, ERROR };
 
 private:
@@ -27,8 +28,18 @@ private:
 	 void on_success(const std::string &message);
 	 void on_error(const std::string &message);
 
+	 // We could've just gotten the pointer with get_application(), and we used to do it actually,
+	 // but we try to fetch the active profile from DBusManager::fetch_active_power_profile()
+	 // in the constructor which could emit an error signal, and at that time MainWindow
+	 // isn't fully created yet, so we can't just get that pointer for sending the error message
+	 // to the user through a desktop notification.
+	 //
+	 // I think it's easier for main() to append the app pointer that's created there in the
+	 // make_window_and_run<>() method's parameters, instead of, for example, making a separate
+	 // method here for fetching the active power profile.
+	 Glib::RefPtr<Gtk::Application> m_app;
 	 std::unique_ptr<DBusManager> m_dbus_manager;
-	 DBusManager::POWER_PROFILE m_current_profile;
+	 DBusManager::POWER_PROFILE m_active_profile;
 
 	 Gtk::Label m_title_label;
 	 Gtk::Label m_explanation_label;

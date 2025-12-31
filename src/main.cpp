@@ -2,12 +2,15 @@
 #include <giomm/notification.h>
 #include <gtkmm/application.h>
 #include <print>
+#include <string>
 
 #include "config.hpp"
 #include "dbus_manager.hpp"
 #include "main_window.hpp"
 
 void usage();
+void show_notification(const std::string &message,
+					   Glib::RefPtr<Gtk::Application> app);
 
 int main(int argc, char *argv[])
 {
@@ -52,24 +55,23 @@ int main(int argc, char *argv[])
 		  }
 
 		  DBusManager manager;
-		  DBusManager::POWER_PROFILE profile(manager.fetch_current_power_profile());
+		  manager
+			   .signal_error()
+			   .connect(sigc::bind(sigc::ptr_fun(show_notification), app));
+
+		  DBusManager::POWER_PROFILE profile(manager.fetch_active_power_profile());
 
 		  std::string message;
 
-		  if (profile == DBusManager::POWER_PROFILE::INVALID)
-			   message = "Failed to fetch active profile. Is power-profiles-daemon running?";
-		  else
+		  if (profile != DBusManager::POWER_PROFILE::INVALID) {
 			   message = std::format("Active profile: {}", manager.power_profile_to_string(profile));
-
-		  Glib::RefPtr<Gio::Notification> notification = Gio::Notification::create(PRETTY_NAME);
-		  notification->set_priority(Gio::Notification::Priority::NORMAL);
-		  notification->set_body(message);
-		  app->send_notification(APP_ID, notification);
+			   show_notification(message, app);
+		  }
 
 		  return !!(profile == DBusManager::POWER_PROFILE::INVALID);
 	 }
 
-	 return app->make_window_and_run<MainWindow>(argc, argv);
+	 return app->make_window_and_run<MainWindow>(argc, argv, app);
 }
 
 void usage()
@@ -80,4 +82,12 @@ void usage()
 	 std::println("--help           | -h    Print this help and exit.");
 	 std::println("--version        | -v    Print this program version and exit.");
 	 std::println();
+}
+
+void show_notification(const std::string &message, Glib::RefPtr<Gtk::Application> app)
+{
+	 Glib::RefPtr<Gio::Notification> notification = Gio::Notification::create(PRETTY_NAME);
+	 notification->set_priority(Gio::Notification::Priority::NORMAL);
+	 notification->set_body(message);
+	 app->send_notification(APP_ID, notification);
 }
